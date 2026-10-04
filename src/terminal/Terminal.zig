@@ -453,8 +453,9 @@ pub fn gpa(self: *Terminal) Allocator {
 ///
 /// Null removes the byte limit and zero disables scrollback. Disabling
 /// scrollback also immediately erases retained history and changes future
-/// scrolling to use the no-scrollback path. The alternate screen is
-/// intentionally unaffected because it never retains scrollback.
+/// scrolling to use the no-scrollback path. Existing alternate screens are
+/// intentionally unaffected; newly-created alternate screens inherit the
+/// primary screen limit.
 pub fn setScrollbackMaxBytes(self: *Terminal, max: ?usize) void {
     const primary = self.screens.get(.primary).?;
     primary.pages.setMaxBytes(max);
@@ -465,8 +466,8 @@ pub fn setScrollbackMaxBytes(self: *Terminal, max: ?usize) void {
 
 /// Change the primary screen's maximum number of physical scrollback lines.
 ///
-/// Null removes the line limit. The alternate screen is intentionally
-/// unaffected because it never retains scrollback.
+/// Null removes the line limit. Existing alternate screens are intentionally
+/// unaffected.
 pub fn setScrollbackMaxLines(self: *Terminal, max: ?usize) void {
     const primary = self.screens.get(.primary).?;
     primary.pages.setMaxLines(max);
@@ -4042,7 +4043,7 @@ test "Terminal setScrollbackMaxLines" {
     );
 }
 
-test "Terminal setScrollback only affects primary screen" {
+test "Terminal alternate screen inherits initial primary scrollback" {
     var t = try init(testing.io, testing.allocator, .{
         .cols = 80,
         .rows = 3,
@@ -4067,14 +4068,14 @@ test "Terminal setScrollback only affects primary screen" {
     try testing.expect(!primary.no_scrollback);
 
     try testing.expectEqual(
-        @as(usize, 0),
+        @as(usize, 10_000),
         alternate.pages.limits.bytes.explicit,
     );
     try testing.expectEqual(
         std.math.maxInt(usize),
         alternate.pages.limits.lines.explicit,
     );
-    try testing.expect(alternate.no_scrollback);
+    try testing.expect(!alternate.no_scrollback);
     try testing.expectEqual(alternate, t.screens.active);
 }
 
@@ -4496,7 +4497,7 @@ pub fn switchScreen(self: *Terminal, key: ScreenSet.Key) !?*Screen {
                 .rows = self.rows,
                 .max_scrollback_bytes = switch (key) {
                     .primary => primary.pages.limits.bytes.explicit,
-                    .alternate => 0,
+                    .alternate => primary.pages.limits.bytes.explicit,
                 },
 
                 // Inherit our Kitty image settings from the primary
