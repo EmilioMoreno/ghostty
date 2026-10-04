@@ -311,7 +311,7 @@ const entries: []const ModeEntry = &.{
     .{ .name = "focus_event", .value = 1004 },
     .{ .name = "mouse_format_utf8", .value = 1005, .default_configurable = false },
     .{ .name = "mouse_format_sgr", .value = 1006, .default_configurable = false },
-    .{ .name = "mouse_alternate_scroll", .value = 1007, .default = true },
+    .{ .name = "mouse_alternate_scroll", .value = 1007, .default = false },
     .{ .name = "mouse_format_urxvt", .value = 1015, .default_configurable = false },
     .{ .name = "mouse_format_sgr_pixels", .value = 1016, .default_configurable = false },
     .{ .name = "ignore_keypad_with_numlock", .value = 1035, .default = true },
@@ -374,6 +374,14 @@ test "ModeState set default updates current and reset value" {
     state.set(.grapheme_cluster, false);
     state.reset();
     try testing.expect(state.get(.grapheme_cluster));
+}
+
+test "alternate scroll defaults off but applications can enable it" {
+    var state: ModeState = .{};
+    try testing.expect(!state.get(.mouse_alternate_scroll));
+
+    state.set(.mouse_alternate_scroll, true);
+    try testing.expect(state.get(.mouse_alternate_scroll));
 }
 
 test "default configurable modes" {
