@@ -3587,9 +3587,17 @@ pub fn scrollCallback(
 
     // log.info("SCROLL: delta_y={} delta_x={}", .{ y.delta, x.delta });
 
-    {
+    scroll: {
         self.renderer_state.mutex.lockUncancelable(global.io());
         defer self.renderer_state.mutex.unlock(global.io());
+
+        // Emilio builds retain scrollback for both primary and alternate
+        // screens. Give vertical wheel input to that local viewport before
+        // applications can consume it as mouse events or cursor keys.
+        if (!self.io.terminal.screens.active.no_scrollback and y.delta != 0) {
+            self.io.terminal.scrollViewport(.{ .delta = y.delta * -1 });
+            break :scroll;
+        }
 
         // If we have an active mouse reporting mode, clear the selection.
         // The selection can occur if the user uses the shift mod key to
@@ -3598,11 +3606,12 @@ pub fn scrollCallback(
             try self.setSelection(null);
         }
 
-        // If we're in alternate screen with alternate scroll enabled, then
-        // we convert to cursor keys. This only happens if we're:
-        // (1) alt screen (2) no explicit mouse reporting and (3) alt
-        // scroll mode enabled.
+        // If we're in an alternate screen without retained scrollback and
+        // alternate scroll is enabled, convert wheel events to cursor keys.
+        // An alternate screen that retains scrollback must use the normal
+        // viewport scrolling path below.
         if (self.io.terminal.screens.active_key == .alternate and
+            self.io.terminal.screens.active.no_scrollback and
             self.io.terminal.flags.mouse_event == .none and
             self.io.terminal.modes.get(.mouse_alternate_scroll))
         {
